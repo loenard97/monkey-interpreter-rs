@@ -17,7 +17,12 @@ pub enum Statement {
 
 impl Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+        match self {
+            Statement::LetStatement(val)               => write!(f, "{}", val),
+            Statement::ReturnStatement(val)         => write!(f, "{}", val),
+            Statement::ExpressionStatement(val) => write!(f, "{}", val),
+            Statement::BlockStatement(val)           => write!(f, "{}", val),
+        }
     }
 }
 
@@ -34,7 +39,21 @@ pub enum Expression {
 
 impl Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+        match self {
+            Expression::Identifier(val)              => write!(f, "{}", val.value),
+            Expression::Boolean(val)                    => write!(f, "{}", val.value),
+            Expression::IntegerLiteral(val)      => write!(f, "{}", val.value),
+            Expression::PrefixExpression(val)  => write!(f, "prefix"),
+            Expression::InfixExpression(val)    => write!(f, "infix"),
+            Expression::IfExpression(val)          => {
+                match &val.alternative {
+                    Some(alternative) => write!(f, "if ({}) {{{}}} else {{{}}}", val.condition, val.consequence, alternative),
+                    None => write!(f, "if ({}) {{{}}}", val.condition, val.consequence)
+                }
+            },
+            Expression::FunctionLiteral(val)    => write!(f, "fn"),
+            Expression::CallExpression(val)      => write!(f, "call()"),
+        }
     }
 }
 
@@ -57,7 +76,8 @@ impl Program {
 
 impl Display for Program {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.statements.iter().map(|s| { s.to_string() }).collect::<String>())
+        let s = self.statements.iter().map(|s| { s.to_string() }).collect::<String>();
+        write!(f, "{}", s)
     }
 }
 
@@ -81,7 +101,7 @@ impl LetStatement {
 
 impl Display for LetStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "let {} = {};", self.name, self.value)
+        write!(f, "let {} = {};", self.name.value, self.value)
     }
 }
 
@@ -157,6 +177,12 @@ impl Display for ExpressionStatement {
 pub struct BlockStatement {
     token: Token,
     statements: Vec<Statement>,
+}
+
+impl BlockStatement {
+    pub fn new(token: Token, statements: Vec<Statement>) -> Self {
+        BlockStatement { token, statements }
+    }
 }
 
 impl Node for BlockStatement {
@@ -248,6 +274,12 @@ pub struct InfixExpression {
     right: Box<Expression>,
 }
 
+impl InfixExpression {
+    pub fn new(token: Token, operator: String, left: Box<Expression>, right: Box<Expression>) -> Self {
+        InfixExpression { token, operator, left, right }
+    }
+}
+
 impl Node for InfixExpression {
     fn token_literal(&self) -> &str {
         self.token.literal()
@@ -318,6 +350,12 @@ pub struct CallExpression {
     arguments: Vec<Expression>,
 }
 
+impl CallExpression {
+    pub fn new(token: Token, function: Box<Expression>, arguments: Vec<Expression>) -> Self {
+        CallExpression { token, function, arguments }
+    }
+}
+
 impl Node for CallExpression {
     fn token_literal(&self) -> &str {
         self.token.literal()
@@ -332,9 +370,7 @@ impl Display for CallExpression {
 
 #[cfg(test)]
 mod test {
-    use crate::Keyword;
-
-    use super::*;
+    use crate::*;
 
     #[test]
     fn expression() {
@@ -346,7 +382,7 @@ mod test {
                 value: Expression::Identifier(Identifier { token: Token::Identifier("exp".to_string()), value: "exp".to_string() }),
             })
         ] };
-
+        
         assert_eq!(
             input.to_string(),
             program.to_string(),

@@ -1,4 +1,3 @@
-
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub enum Keyword {
     Function,
@@ -22,6 +21,18 @@ impl Keyword {
             "return"    => Some(Self::Return),
 
             _           => None,
+        }
+    }
+
+    fn literal(&self) -> &str {
+        match self {
+            Keyword::Function => "fn",
+            Keyword::Let    => "let",
+            Keyword::True   => "true",
+            Keyword::False  => "false",
+            Keyword::If     => "if",
+            Keyword::Else   => "else",
+            Keyword::Return => "return",
         }
     }
 }
@@ -66,8 +77,8 @@ impl Token {
 
     pub fn literal(&self) -> &str {
         match self {
-            Token::Identifier(_)    => "Identifier",
-            Token::Number(_)        => "Number",
+            Token::Identifier(val)    => val,
+            Token::Number(val)        => val,
 
             Token::Assign           => "=",
             Token::Plus             => "+",
@@ -88,7 +99,7 @@ impl Token {
             Token::Eq               => "==",
             Token::Neq              => "!=",
 
-            Token::Keyword(_)       => "Keyword",
+            Token::Keyword(val)       => val.literal(),
 
             Token::Eof              => "EOF",
             Token::Illegal          => "Illegal",
