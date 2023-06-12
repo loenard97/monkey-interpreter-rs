@@ -19,7 +19,6 @@ impl Keyword {
             "if"        => Some(Self::If),
             "else"      => Some(Self::Else),
             "return"    => Some(Self::Return),
-
             _           => None,
         }
     }
@@ -77,8 +76,8 @@ impl Token {
 
     pub fn literal(&self) -> &str {
         match self {
-            Token::Identifier(val)    => val,
-            Token::Number(val)        => val,
+            Token::Identifier(val) => val,
+            Token::Number(val) => val,
 
             Token::Assign           => "=",
             Token::Plus             => "+",
@@ -99,7 +98,7 @@ impl Token {
             Token::Eq               => "==",
             Token::Neq              => "!=",
 
-            Token::Keyword(val)       => val.literal(),
+            Token::Keyword(val) => val.literal(),
 
             Token::Eof              => "EOF",
             Token::Illegal          => "Illegal",

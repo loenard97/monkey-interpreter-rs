@@ -18,10 +18,10 @@ pub enum Statement {
 impl Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Statement::LetStatement(val)               => write!(f, "{}", val),
-            Statement::ReturnStatement(val)         => write!(f, "{}", val),
-            Statement::ExpressionStatement(val) => write!(f, "{}", val),
-            Statement::BlockStatement(val)           => write!(f, "{}", val),
+            Statement::LetStatement(val)               => val.fmt(f),
+            Statement::ReturnStatement(val)         => val.fmt(f),
+            Statement::ExpressionStatement(val) => val.fmt(f),
+            Statement::BlockStatement(val)           => val.fmt(f),
         }
     }
 }
@@ -43,16 +43,11 @@ impl Display for Expression {
             Expression::Identifier(val)              => write!(f, "{}", val.value),
             Expression::Boolean(val)                    => write!(f, "{}", val.value),
             Expression::IntegerLiteral(val)      => write!(f, "{}", val.value),
-            Expression::PrefixExpression(val)  => write!(f, "prefix"),
-            Expression::InfixExpression(val)    => write!(f, "infix"),
-            Expression::IfExpression(val)          => {
-                match &val.alternative {
-                    Some(alternative) => write!(f, "if ({}) {{{}}} else {{{}}}", val.condition, val.consequence, alternative),
-                    None => write!(f, "if ({}) {{{}}}", val.condition, val.consequence)
-                }
-            },
-            Expression::FunctionLiteral(val)    => write!(f, "fn"),
-            Expression::CallExpression(val)      => write!(f, "call()"),
+            Expression::PrefixExpression(val)  => write!(f, "{}{}", val.operator, val.right),
+            Expression::InfixExpression(val)    => val.fmt(f),
+            Expression::IfExpression(val)          => val.fmt(f),
+            Expression::FunctionLiteral(val)    => val.fmt(f),
+            Expression::CallExpression(val)      => val.fmt(f),
         }
     }
 }
@@ -64,13 +59,6 @@ pub struct Program {
 impl Program {
     pub fn new(statements: Vec<Statement>) -> Self {
         Program { statements }
-    }
-
-    fn token_literal(&self) -> String {
-        match self.statements.get(0) {
-            Some(val) => val.to_string(),
-            None => String::new(),
-        }
     }
 }
 
@@ -170,7 +158,7 @@ impl Node for ExpressionStatement {
 
 impl Display for ExpressionStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.expression)
+        write!(f, "{};", self.expression)
     }
 }
 
@@ -288,7 +276,7 @@ impl Node for InfixExpression {
 
 impl Display for InfixExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({} {} {})", self.left, self.operator, self.right)
+        write!(f, "{} {} {}", self.left, self.operator, self.right)
     }
 }
 
@@ -313,10 +301,10 @@ impl Node for IfExpression {
 
 impl Display for IfExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "if {} {}{}", self.condition, self.consequence, match &self.alternative {
-            Some(val) => " else ".to_string() + &val.to_string(),
-            None => "".to_string(),
-        })
+        match &self.alternative {
+            Some(alternative) => write!(f, "if ({}) {{{}}} else {{{}}}", self.condition, self.consequence, alternative),
+            None                               => write!(f, "if ({}) {{{}}}", self.condition, self.consequence)
+        }
     }
 }
 
@@ -340,7 +328,7 @@ impl Node for FunctionLiteral {
 
 impl Display for FunctionLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "fn ({}) {}", self.parameters.iter().map(|s| s.to_string()).collect::<String>(), self.body)
+        write!(f, "fn({}) {{{}}}", self.parameters.iter().map(|e| e.to_string() ).collect::<String>(), self.body)
     }
 }
 
@@ -364,7 +352,8 @@ impl Node for CallExpression {
 
 impl Display for CallExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}({})", self.function, self.arguments.iter().map(|s| s.to_string()).collect::<String>())
+        let args = self.arguments.iter().map(|a| a.to_string() ).collect::<Vec<String>>().join(", ");
+        write!(f, "{}({})", self.function, args)
     }
 }
 

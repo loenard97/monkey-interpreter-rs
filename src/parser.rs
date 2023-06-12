@@ -33,7 +33,7 @@ enum Precedence {
 }
 
 impl Precedence {
-    fn from_token(token: Token) -> Self {
+    fn from_token(token: &Token) -> Self {
         match token {
             Token::Eq       | Token::Neq        => Self::Equals,
             Token::Lt       | Token::Gt         => Self::Comparison,
@@ -102,14 +102,6 @@ impl Parser {
         }
     }
 
-    fn cur_token_is(&self, token: Token) -> bool {
-        self.cur_token == Some(token)
-    }
-
-    fn peek_token_is(&self, token: Token) -> bool {
-        self.peek_token == Some(token)
-    }
-
     fn expect_peek(&mut self, token: Token) -> bool {
         match &self.peek_token {
             Some(_) => {
@@ -172,7 +164,8 @@ impl Parser {
     }
 
     fn parse_let_statement(&mut self) -> Option<Statement> {
-        if self.cur_token != Some(Token::Keyword(Keyword::Let)) {
+        let token = self.cur_token.clone().unwrap();
+        if token != Token::Keyword(Keyword::Let) {
             return None;
         }
         self.next_token();
@@ -196,10 +189,11 @@ impl Parser {
             },
         };
 
-        if self.peek_token_is(Token::Semicolon) {
+        let peek_token = self.peek_token.clone().unwrap();
+        if peek_token == Token::Semicolon {
             self.next_token();
         }
-
+        
         Some(Statement::LetStatement(LetStatement::new(Token::Keyword(Keyword::Let), name, value)))
     }
 
@@ -239,7 +233,7 @@ impl Parser {
     fn parse_integer_literal(&mut self) -> Expression {
         let token = self.cur_token.clone().unwrap();
         let value = token.literal().parse().unwrap();
-
+        println!("int lit {:?} {}", token, value);
         Expression::IntegerLiteral(IntegerLiteral::new(token, value))
     }
 
@@ -298,7 +292,8 @@ impl Parser {
 
         let consequence = self.parse_block_statement();
 
-        let alternative = if self.peek_token_is(Token::Keyword(Keyword::Else)) {
+        let peek_token = self.peek_token.clone().unwrap();
+        let alternative = if peek_token == Token::Keyword(Keyword::Else) {
             self.next_token();
 
             if !self.expect_peek(Token::Lbrace) {
@@ -336,8 +331,9 @@ impl Parser {
 
     fn parse_function_parameters(&mut self) -> Vec<Identifier> {
         let mut identifier = vec![];
+        let peek_token = self.peek_token.clone().unwrap();
 
-        if self.peek_token_is(Token::Rparen) {
+        if peek_token == Token::Rparen {
             self.next_token();
             return identifier;
         }
@@ -350,7 +346,8 @@ impl Parser {
 
         identifier.push(ident);
 
-        if self.peek_token_is(Token::Comma) {
+        let peek_token = self.peek_token.clone().unwrap();
+        if peek_token == Token::Comma {
             self.next_token();
             self.next_token();
 
@@ -373,9 +370,10 @@ impl Parser {
     fn parse_infix_expression(&mut self, left: Expression) -> Expression {
         let token = self.cur_token.clone().unwrap();
         let operator = token.literal().to_string();
+        let precedence = Precedence::from_token(&token);
 
-        let precedence = self.cur_precedence();
         self.next_token();
+        
         let right = Box::new(self.parse_expression(precedence).unwrap());
         let left = Box::new(left);
 
@@ -392,8 +390,9 @@ impl Parser {
 
     fn parse_call_arguments(&mut self) -> Vec<Expression> {
         let mut args = Vec::new();
+        let peek_token = self.peek_token.clone().unwrap();
 
-        if self.peek_token_is(Token::Rparen) {
+        if peek_token == Token::Rparen {
             self.next_token();
             return args;
         }
@@ -401,7 +400,7 @@ impl Parser {
         self.next_token();
         args.push(self.parse_expression(Precedence::Lowest).unwrap());
 
-        while self.peek_token_is(Token::Comma) {
+        while self.peek_token.clone().unwrap() == Token::Comma {
             self.next_token();
             self.next_token();
             
@@ -422,7 +421,7 @@ impl Parser {
 
         self.next_token();
 
-        if !self.cur_token_is(Token::Rbrace) && !self.cur_token_is(Token::Eof) {
+        if token != Token::Rbrace && token != Token::Eof {
             let stmt = self.parse_statement().unwrap();
             statements.push(stmt);
             self.next_token();
@@ -439,7 +438,10 @@ impl Parser {
             None => return None,
         };
 
-        if self.peek_token_is(Token::Semicolon) && precedence < self.peek_precedence() {
+        let peek_token = self.peek_token.clone().unwrap();
+        let peek_precedence = Precedence::from_token(&peek_token);
+
+        while self.peek_token.clone().unwrap() != Token::Semicolon && precedence < peek_precedence {
             let peek_token = self.peek_token.clone().unwrap();
             
             let infix = match Parser::infix_parse_fn(peek_token) {
@@ -452,16 +454,6 @@ impl Parser {
 
         Some(left)
     }
-
-    fn cur_precedence(&self) -> Precedence {
-        let token = self.cur_token.clone().unwrap();
-        Precedence::from_token(token)
-    }
-
-    fn peek_precedence(&self) -> Precedence {
-        let token = self.peek_token.clone().unwrap();
-        Precedence::from_token(token)
-    }
 }
 
 #[cfg(test)]
@@ -469,8 +461,137 @@ mod test {
     use crate::*;
 
     #[test]
-    fn let_statement() {
+    fn let_simple() {
         let input = "let x = 5;";
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        println!("{}", parser.errors());
+        assert_eq!(0, parser.n_errors());
+        assert_eq!(input.to_string(), program.to_string());
+    }
+
+    #[test]
+    fn let_bool() {
+        let input = "let y = true;";
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        println!("{}", parser.errors());
+        assert_eq!(0, parser.n_errors());
+        assert_eq!(input.to_string(), program.to_string());
+    }
+
+    #[test]
+    fn let_ident() {
+        let input = "let foobar = y;";
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        println!("{}", parser.errors());
+        assert_eq!(0, parser.n_errors());
+        assert_eq!(input.to_string(), program.to_string());
+    }
+
+    #[test]
+    fn return_simple() {
+        let input = "return 5;";
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        println!("{}", parser.errors());
+        assert_eq!(0, parser.n_errors());
+        assert_eq!(input.to_string(), program.to_string());
+    }
+
+    #[test]
+    fn return_bool() {
+        let input = "return true;";
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        println!("{}", parser.errors());
+        assert_eq!(0, parser.n_errors());
+        assert_eq!(input.to_string(), program.to_string());
+    }
+
+    #[test]
+    fn return_ident() {
+        let input = "return foobar;";
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        println!("{}", parser.errors());
+        assert_eq!(0, parser.n_errors());
+        assert_eq!(input.to_string(), program.to_string());
+    }
+
+    #[test]
+    fn prefix() {
+        let input = vec![
+		    "!5;",
+		    "-15;",
+		    "!foobar;",
+		    "-foobar;",
+		    "!true;",
+		    "!false;",
+        ];
+
+        for val in input {
+            let lexer = Lexer::new(val);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+
+            println!("{}", parser.errors());
+            assert_eq!(0, parser.n_errors());
+            assert_eq!(val.to_string(), program.to_string());
+        }
+    }
+
+    #[test]
+    fn infix() {
+        let input = vec![
+            "5 + 5;",
+		    "5 - 5;",
+		    "5 * 5;",
+		    "5 / 5;",
+		    "5 > 5;",
+		    "5 < 5;",
+		    "5 == 5;",
+		    "5 != 5;",
+		    "foobar + barfoo;",
+		    "foobar - barfoo;",
+		    "foobar * barfoo;",
+		    "foobar / barfoo;",
+		    "foobar > barfoo;",
+		    "foobar < barfoo;",
+		    "foobar == barfoo;",
+		    "foobar != barfoo;",
+		    "true == true;",
+		    "true != false;",
+		    "false == false;",
+        ];
+
+        for val in input {
+            let lexer = Lexer::new(val);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+
+            println!("{}", parser.errors());
+            assert_eq!(0, parser.n_errors());
+            assert_eq!(val.to_string(), program.to_string());
+        }
+    }
+
+    #[test]
+    fn ident() {
+        let input = "foobar;";
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program();
@@ -530,6 +651,7 @@ mod test {
         let program = parser.parse_program();
 
         println!("{}", parser.errors());
+        println!("{}", program.to_string());
         assert_eq!(0, parser.n_errors());
         assert_eq!(input.to_string(), program.to_string());
     }
@@ -539,7 +661,7 @@ mod test {
         let input = "\
             if (true) {\
                 return 1;\
-            }\
+            };\
         ";
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
@@ -557,7 +679,7 @@ mod test {
                 return 1;\
             } else {\
                 return 0;\
-            }\
+            };\
         ";
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
